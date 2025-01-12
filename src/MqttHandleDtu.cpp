@@ -9,6 +9,14 @@
 #include <Hoymiles.h>
 #include <CpuTemperature.h>
 
+extern float batteryVoltage;
+extern float batteryCurrent;
+extern long cellVoltage[16];
+extern long cellTemperature[4];
+extern int8_t bmsTemperature;
+extern int8_t SOC;
+extern int8_t cycles;
+
 MqttHandleDtuClass MqttHandleDtu;
 
 MqttHandleDtuClass::MqttHandleDtuClass()
@@ -39,6 +47,11 @@ void MqttHandleDtuClass::loop()
     MqttSettings.publish("dtu/heap/free", String(ESP.getFreeHeap()));
     MqttSettings.publish("dtu/heap/minfree", String(ESP.getMinFreeHeap()));
     MqttSettings.publish("dtu/heap/maxalloc", String(ESP.getMaxAllocHeap()));
+    MqttSettings.publish("dtu/battery/voltage", String(batteryVoltage));
+    MqttSettings.publish("dtu/battery/current", String(batteryCurrent));
+    MqttSettings.publish("dtu/battery/soc",     String(SOC));
+    MqttSettings.publish("dtu/battery/cycles",   String(cycles));
+
     if (NetworkSettings.NetworkMode() == network_mode::WiFi) {
         MqttSettings.publish("dtu/rssi", String(WiFi.RSSI()));
         MqttSettings.publish("dtu/bssid", WiFi.BSSIDstr());

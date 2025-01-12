@@ -73,6 +73,12 @@ void MqttHandleHassClass::publishConfig()
 
     publishDtuBinarySensor("Status", config.Mqtt.Lwt.Topic, config.Mqtt.Lwt.Value_Online, config.Mqtt.Lwt.Value_Offline, DEVICE_CLS_CONNECTIVITY, STATE_CLS_NONE, CATEGORY_DIAGNOSTIC);
 
+    publishDtuSensor("Battery total voltage", "dtu/battery/voltage", "V", "mdi:current-dc",  DEVICE_CLS_VOLTAGE, STATE_CLS_MEASUREMENT, CATEGORY_NONE);
+    publishDtuSensor("Battery charging current", "dtu/battery/current", "A", "mdi:sine-wave",   DEVICE_CLS_CURRENT, STATE_CLS_MEASUREMENT, CATEGORY_NONE);
+    publishDtuSensor("Battery state of charge", "dtu/battery/soc",     "%", "mdi:speedometer", DEVICE_CLS_ENERGY,  STATE_CLS_MEASUREMENT, CATEGORY_NONE);
+    publishDtuSensor("Battery storage cycles", "dtu/battery/cycles", "cycles", "mdi:sync-circle",   DEVICE_CLS_NONE, STATE_CLS_MEASUREMENT, CATEGORY_NONE);
+
+
     // Loop all inverters
     for (uint8_t i = 0; i < Hoymiles.getNumInverters(); i++) {
         auto inv = Hoymiles.getInverterByPos(i);
