@@ -27,10 +27,10 @@ export default defineConfig({
     VueI18nPlugin({
         /* options */
         include: path.resolve(path.dirname(fileURLToPath(import.meta.url)), './src/locales/**.json'),
+        runtimeOnly: false,
         fullInstall: false,
         forceStringify: true,
         strictMessage: false,
-        jitCompilation: false,
     }),
   ],
   resolve: {
@@ -45,6 +45,15 @@ export default defineConfig({
     outDir: '../webapp_dist',
     emptyOutDir: true,
     minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+      format: {
+        comments: false,
+      },
+    },
     chunkSizeWarningLimit: 1024,
     rollupOptions: {
       output: {
@@ -56,9 +65,19 @@ export default defineConfig({
         assetFileNames: "assets/[name].[ext]",
       },
     },
+    target: 'es2022',
   },
-  esbuild: {
-    drop: ['console', 'debugger'],
+  css: {
+    preprocessorOptions: {
+      scss: {
+        // Required to make bootstrap compile without errors
+        silenceDeprecations: [
+          'import',
+          'color-functions',
+          'global-builtin',
+        ],
+      },
+    },
   },
   server: {
     proxy: {

@@ -11,7 +11,12 @@
         <InverterTotalInfo :totalData="liveData.total" /><br />
         <div class="row gy-3">
             <div class="col-sm-3 col-md-2" :style="[inverterData.length == 1 ? { display: 'none' } : {}]">
-                <div class="nav nav-pills row-cols-sm-1" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                <div
+                    class="nav nav-pills row-cols-sm-1 gap-3"
+                    id="v-pills-tab"
+                    role="tablist"
+                    aria-orientation="vertical"
+                >
                     <button
                         v-for="inverter in inverterData"
                         :key="inverter.serial"
@@ -24,16 +29,26 @@
                         aria-controls="'v-pills-' + inverter.serial"
                         aria-selected="true"
                     >
-                        <div class="row">
-                            <div class="col-auto col-sm-2">
-                                <BIconXCircleFill class="fs-4" v-if="!inverter.reachable" />
-                                <BIconExclamationCircleFill
-                                    class="fs-4"
-                                    v-if="inverter.reachable && !inverter.producing"
-                                />
-                                <BIconCheckCircleFill class="fs-4" v-if="inverter.reachable && inverter.producing" />
+                        <div class="d-flex align-items-center">
+                            <div class="me-2">
+                                <span
+                                    v-if="inverter.AC"
+                                    class="badge"
+                                    :class="{
+                                        'text-bg-secondary': !inverter.poll_enabled,
+                                        'text-bg-danger': inverter.poll_enabled && !inverter.reachable,
+                                        'text-bg-warning':
+                                            inverter.poll_enabled && inverter.reachable && !inverter.producing,
+                                        'text-bg-success':
+                                            inverter.poll_enabled && inverter.reachable && inverter.producing,
+                                    }"
+                                >
+                                    {{ $n(inverter.AC[0]?.Power?.v || 0, 'decimalNoDigits') }}
+                                    {{ inverter.AC[0]?.Power?.u }}
+                                </span>
+                                <span v-else class="badge text-bg-light">-</span>
                             </div>
-                            <div class="col-sm-9">
+                            <div class="ms-auto me-auto">
                                 {{ inverter.name }}
                             </div>
                         </div>
@@ -65,7 +80,7 @@
                                 'text-bg-tertiary': !inverter.poll_enabled,
                                 'text-bg-danger': inverter.poll_enabled && !inverter.reachable,
                                 'text-bg-warning': inverter.poll_enabled && inverter.reachable && !inverter.producing,
-                                'text-bg-primary': inverter.poll_enabled && inverter.reachable && inverter.producing,
+                                'text-bg-success': inverter.poll_enabled && inverter.reachable && inverter.producing,
                             }"
                         >
                             <div class="p-1 flex-grow-1">
@@ -77,17 +92,13 @@
                                         {{ $t('home.SerialNumber') }}{{ inverter.serial }}
                                     </div>
                                     <div style="padding-right: 2em">
-                                        {{ $t('home.CurrentLimit')
-                                        }}<template v-if="inverter.limit_absolute > -1">
+                                        {{ $t('home.CurrentLimit') }}:
+                                        <template v-if="inverter.limit_absolute > -1">
                                             {{ $n(inverter.limit_absolute, 'decimalNoDigits') }} W | </template
                                         >{{ $n(inverter.limit_relative / 100, 'percentOneDigit') }}
                                     </div>
                                     <div style="padding-right: 2em">
-                                        {{ $t('home.DataAge') }}
-                                        {{ $t('home.Seconds', { val: $n(inverter.data_age) }) }}
-                                        <template v-if="inverter.data_age > 300">
-                                            / {{ calculateAbsoluteTime(inverter.data_age) }}
-                                        </template>
+                                        <DataAgeDisplay :data-age-ms="inverter.data_age_ms" />
                                     </div>
                                 </div>
                             </div>
@@ -185,11 +196,11 @@
                                                     (chanType.name == 'DC' && getSumIrridiation(inverter) == 0) ||
                                                     (chanType.name == 'DC' &&
                                                         getSumIrridiation(inverter) > 0 &&
-                                                        chanType.obj[channel].Irradiation?.max) ||
+                                                        chanType.obj[channel]?.Irradiation?.max) ||
                                                     0 > 0
                                                 "
                                             >
-                                                <div class="col">
+                                                <div class="col" v-if="chanType.obj[channel]">
                                                     <InverterChannelInfo
                                                         :channelData="chanType.obj[channel]"
                                                         :channelType="chanType.name"
@@ -211,8 +222,8 @@
                                 </div>
                             </BootstrapAlert>
 
-                            <div class="accordion mt-5" id="accordionExample">
-                                <div class="accordion-item">
+                            <div class="accordion mt-5" id="accordionRadioStats">
+                                <div class="accordion-item accordion-table">
                                     <h2 class="accordion-header">
                                         <button
                                             class="accordion-button collapsed"
@@ -228,7 +239,7 @@
                                     <div
                                         id="collapseStats"
                                         class="accordion-collapse collapse"
-                                        data-bs-parent="#accordionExample"
+                                        data-bs-parent="#accordionRadioStats"
                                     >
                                         <div class="accordion-body">
                                             <table class="table table-striped table-hover">
@@ -303,23 +314,25 @@
                                                     </tr>
                                                 </tbody>
                                             </table>
-                                            <button
-                                                :disabled="!isLogged || performRadioStatsReset"
-                                                type="button"
-                                                class="btn btn-danger"
-                                                @click="onResetRadioStats(inverter.serial)"
-                                            >
-                                                <template v-if="!performRadioStatsReset">
-                                                    {{ $t('home.StatsReset') }}
-                                                </template>
-                                                <template v-else>
-                                                    <span
-                                                        class="spinner-border spinner-border-sm"
-                                                        aria-hidden="true"
-                                                    ></span>
-                                                    <span role="status"> {{ $t('home.StatsResetting') }}</span>
-                                                </template>
-                                            </button>
+                                            <div class="d-flex">
+                                                <button
+                                                    :disabled="!isLogged || performRadioStatsReset"
+                                                    type="button"
+                                                    class="btn btn-danger ms-auto me-3 mt-3"
+                                                    @click="onResetRadioStats(inverter.serial)"
+                                                >
+                                                    <template v-if="!performRadioStatsReset">
+                                                        <BIconArrowCounterclockwise />&nbsp;{{ $t('home.StatsReset') }}
+                                                    </template>
+                                                    <template v-else>
+                                                        <span
+                                                            class="spinner-border spinner-border-sm"
+                                                            aria-hidden="true"
+                                                        ></span>
+                                                        <span role="status">&nbsp;{{ $t('home.StatsResetting') }}</span>
+                                                    </template>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -421,15 +434,15 @@
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li>
-                            <a class="dropdown-item" @click="onSelectType(1)" href="#">{{ $t('home.Relative') }}</a>
+                            <a class="dropdown-item" @click="onSelectType(true)" href="#">{{ $t('home.Relative') }}</a>
                         </li>
                         <li>
-                            <a class="dropdown-item" @click="onSelectType(0)" href="#">{{ $t('home.Absolute') }}</a>
+                            <a class="dropdown-item" @click="onSelectType(false)" href="#">{{ $t('home.Absolute') }}</a>
                         </li>
                     </ul>
                 </div>
                 <div
-                    v-if="targetLimitType == 0"
+                    v-if="!targetLimitRelative"
                     class="alert alert-secondary mt-3"
                     role="alert"
                     v-html="$t('home.LimitHint')"
@@ -487,17 +500,19 @@
 <script lang="ts">
 import BasePage from '@/components/BasePage.vue';
 import BootstrapAlert from '@/components/BootstrapAlert.vue';
+import DataAgeDisplay from '@/components/DataAgeDisplay.vue';
 import DevInfo from '@/components/DevInfo.vue';
 import EventLog from '@/components/EventLog.vue';
 import GridProfile from '@/components/GridProfile.vue';
 import HintView from '@/components/HintView.vue';
 import InverterChannelInfo from '@/components/InverterChannelInfo.vue';
 import InverterTotalInfo from '@/components/InverterTotalInfo.vue';
+import { LimitType } from '@/types/LimitConfig';
 import ModalDialog from '@/components/ModalDialog.vue';
 import type { DevInfoStatus } from '@/types/DevInfoStatus';
 import type { EventlogItems } from '@/types/EventlogStatus';
-import type { GridProfileStatus } from '@/types/GridProfileStatus';
 import type { GridProfileRawdata } from '@/types/GridProfileRawdata';
+import type { GridProfileStatus } from '@/types/GridProfileStatus';
 import type { LimitConfig } from '@/types/LimitConfig';
 import type { LimitStatus } from '@/types/LimitStatus';
 import type { Inverter, LiveData } from '@/types/LiveDataStatus';
@@ -506,9 +521,7 @@ import * as bootstrap from 'bootstrap';
 import {
     BIconArrowCounterclockwise,
     BIconBroadcast,
-    BIconCheckCircleFill,
     BIconCpu,
-    BIconExclamationCircleFill,
     BIconInfoCircle,
     BIconJournalText,
     BIconOutlet,
@@ -516,7 +529,6 @@ import {
     BIconSpeedometer,
     BIconToggleOff,
     BIconToggleOn,
-    BIconXCircleFill,
 } from 'bootstrap-icons-vue';
 import { defineComponent } from 'vue';
 
@@ -524,6 +536,7 @@ export default defineComponent({
     components: {
         BasePage,
         BootstrapAlert,
+        DataAgeDisplay,
         DevInfo,
         EventLog,
         GridProfile,
@@ -533,9 +546,7 @@ export default defineComponent({
         ModalDialog,
         BIconArrowCounterclockwise,
         BIconBroadcast,
-        BIconCheckCircleFill,
         BIconCpu,
-        BIconExclamationCircleFill,
         BIconInfoCircle,
         BIconJournalText,
         BIconOutlet,
@@ -543,15 +554,14 @@ export default defineComponent({
         BIconSpeedometer,
         BIconToggleOff,
         BIconToggleOn,
-        BIconXCircleFill,
     },
     data() {
         return {
-            isLogged: this.isLoggedIn(),
+            isLogged: isLoggedIn(),
 
             socket: {} as WebSocket,
             heartInterval: 0,
-            dataAgeInterval: 0,
+            dataAgeTimers: {} as Record<string, number>,
             dataLoading: true,
             liveData: {} as LiveData,
             isFirstFetchAfterConnect: true,
@@ -575,7 +585,7 @@ export default defineComponent({
             targetLimitMin: 0,
             targetLimitMax: 100,
             targetLimitTypeText: this.$t('home.Relative'),
-            targetLimitType: 1,
+            targetLimitRelative: true,
 
             alertMessageLimit: '',
             alertTypeLimit: 'info',
@@ -596,7 +606,6 @@ export default defineComponent({
     created() {
         this.getInitialData();
         this.initSocket();
-        this.initDataAgeing();
         this.$emitter.on('logged-in', () => {
             this.isLogged = this.isLoggedIn();
         });
@@ -695,8 +704,10 @@ export default defineComponent({
                     );
                     if (foundIdx == -1) {
                         Object.assign(this.liveData.inverters, newData.inverters);
-                    } else {
+                        this.liveData.inverters.forEach((inv) => this.resetDataAging(inv));
+                    } else if (this.liveData.inverters[foundIdx]) {
                         Object.assign(this.liveData.inverters[foundIdx], newData.inverters[0]);
+                        this.resetDataAging(this.liveData.inverters[foundIdx]);
                     }
                     this.dataLoading = false;
                     this.heartCheck(); // Reset heartbeat detection
@@ -723,13 +734,26 @@ export default defineComponent({
                 this.closeSocket();
             };
         },
-        initDataAgeing() {
-            this.dataAgeInterval = setInterval(() => {
-                if (this.inverterData) {
-                    this.inverterData.forEach((element) => {
-                        element.data_age++;
-                    });
-                }
+        resetDataAging(inv: Inverter) {
+            if (this.dataAgeTimers[inv.serial] !== undefined) {
+                clearTimeout(this.dataAgeTimers[inv.serial]);
+            }
+
+            const nextMs = 1000 - (inv.data_age_ms % 1000);
+            this.dataAgeTimers[inv.serial] = setTimeout(() => {
+                this.doDataAging(inv.serial);
+            }, nextMs);
+        },
+        doDataAging(serial: string) {
+            const inv = this.liveData?.inverters?.find((inv) => inv.serial === serial);
+            if (inv === undefined) {
+                return;
+            }
+
+            inv.data_age_ms += 1000;
+
+            this.dataAgeTimers[serial] = setTimeout(() => {
+                this.doDataAging(serial);
             }, 1000);
         },
         // Send heartbeat packets regularly * 59s Send a heartbeat
@@ -800,8 +824,7 @@ export default defineComponent({
             this.showAlertLimit = false;
             this.targetLimitList.serial = '';
             this.targetLimitList.limit_value = 0;
-            this.targetLimitType = 1;
-            this.targetLimitTypeText = this.$t('home.Relative');
+            this.onSelectType(true);
 
             this.limitSettingLoading = true;
             fetch('/api/limit/status', { headers: authHeader() })
@@ -823,7 +846,19 @@ export default defineComponent({
                 });
         },
         onSetLimitSettings(setPersistent: boolean) {
-            this.targetLimitList.limit_type = (setPersistent ? 256 : 0) + this.targetLimitType;
+            if (setPersistent) {
+                if (this.targetLimitRelative) {
+                    this.targetLimitList.limit_type = LimitType.RelativPersistent;
+                } else {
+                    this.targetLimitList.limit_type = LimitType.AbsolutPersistent;
+                }
+            } else {
+                if (this.targetLimitRelative) {
+                    this.targetLimitList.limit_type = LimitType.RelativNonPersistent;
+                } else {
+                    this.targetLimitList.limit_type = LimitType.AbsolutNonPersistent;
+                }
+            }
             const formData = new FormData();
             formData.append('data', JSON.stringify(this.targetLimitList));
 
@@ -845,8 +880,8 @@ export default defineComponent({
                     }
                 });
         },
-        onSelectType(type: number) {
-            if (type == 1) {
+        onSelectType(isRelative: boolean) {
+            if (isRelative) {
                 this.targetLimitTypeText = this.$t('home.Relative');
                 this.targetLimitMin = 0;
                 this.targetLimitMax = 100;
@@ -855,7 +890,7 @@ export default defineComponent({
                 this.targetLimitMin = 0;
                 this.targetLimitMax = this.currentLimitList.max_power > 0 ? this.currentLimitList.max_power : 2250;
             }
-            this.targetLimitType = type;
+            this.targetLimitRelative = isRelative;
         },
 
         onShowPowerSettings(serial: string) {
@@ -907,14 +942,10 @@ export default defineComponent({
                     }
                 });
         },
-        calculateAbsoluteTime(lastTime: number): string {
-            const date = new Date(Date.now() - lastTime * 1000);
-            return this.$d(date, 'datetime');
-        },
         getSumIrridiation(inv: Inverter): number {
             let total = 0;
             Object.keys(inv.DC).forEach((key) => {
-                total += inv.DC[key as unknown as number].Irradiation?.max || 0;
+                total += inv.DC[key as unknown as number]?.Irradiation?.max || 0;
             });
             return total;
         },
@@ -928,7 +959,7 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
 .btn-group {
     border-radius: var(--bs-border-radius);
     margin-top: 0.25rem;
