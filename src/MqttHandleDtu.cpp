@@ -13,9 +13,9 @@ extern float batteryVoltage;
 extern float batteryCurrent;
 extern long cellVoltage[16];
 extern long cellTemperature[4];
-extern int8_t bmsTemperature;
-extern int8_t SOC;
-extern int8_t cycles;
+extern int16_t bmsTemperature;
+extern int16_t SOC;
+extern int16_t cycles;
 
 MqttHandleDtuClass MqttHandleDtu;
 

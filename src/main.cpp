@@ -59,9 +59,9 @@ extern long cellVoltage[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 extern long cellTemperature[4] = { 0, 0, 0, 0 };
 extern int8_t bmsTemperature = 0;
 extern int8_t SOC = 99;
-extern int8_t cycles = 0;
+extern uint16_t cycles = 0;
 
-int counter = 0;
+int counter = 20;
 
 byte StrtoByte(String str_value)
 {
@@ -112,11 +112,7 @@ String ModRTU_CRC(String raw_msg_data)
 
 long responseToLong(int _index)
 {
-    char _rawChar[4];
-    sprintf(_rawChar, "%.2X%.2X", response[_index], response[_index + 1]);
-    String _rawString(_rawChar);
-    int _rawInt = strtol(_rawString.c_str(), 0, 16);
-    return _rawInt;
+    return ((uint16_t)response[_index] << 8) | response[_index + 1];
 }
 
 long responseToCurrent(int _index)
@@ -129,10 +125,15 @@ long responseToCurrent(int _index)
     int base = ((int)(b)-2) * (-255);
     int current = base - _rawInt;
 
-    MessageOutput.println("Current values:");
-    MessageOutput.println(response[_index + 0], DEC);
-    MessageOutput.println(response[_index + 1], DEC);
+    ESP_LOGI("RS485", "Current values: %d %d", response[_index], response[_index + 1]);
     return current;
+}
+
+void logResponse()
+{
+    for (int i = 0; i < 80; i++) {
+        ESP_LOGD("RS485", "response[%d]: %02X", i, response[i]);
+    }
 }
 
 void calculateCRCs(int _clientAddress)
@@ -150,17 +151,11 @@ void calculateCRCs(int _clientAddress)
 void sendCommand(int _commandIndex)
 {
     if (DEBUG) {
-        Serial.println("Sending command:");
-        Serial.println(clientAddress, HEX);
-        Serial.println(3, HEX);
-        Serial.println(commandByte1[_commandIndex], HEX);
-        Serial.println(commandByte2[_commandIndex], HEX);
-        Serial.println(commandByte3[_commandIndex], HEX);
-        Serial.println(commandByte4[_commandIndex], HEX);
-        Serial.println(crcByte1[_commandIndex], HEX);
-        Serial.println(crcByte2[_commandIndex], HEX);
-        Serial.println();
-        Serial.println();
+        ESP_LOGI("RS485", "Sending command: %02X 03 %02X %02X %02X %02X %02X %02X",
+            clientAddress,
+            commandByte1[_commandIndex], commandByte2[_commandIndex],
+            commandByte3[_commandIndex], commandByte4[_commandIndex],
+            crcByte1[_commandIndex], crcByte2[_commandIndex]);
     }
 
     Serial1.write(clientAddress);
@@ -175,56 +170,58 @@ void sendCommand(int _commandIndex)
 
 void parseResponse(int _commandIndex)
 {
-    if (DEBUG) {
-        Serial.println("Parsing response for command with index " + (String)_commandIndex);
-    }
+    ESP_LOGI("RS485", "Parsing response for command with index %d", _commandIndex);
     int8_t SOC_temp;
     float batteryVoltage_temp;
     float batteryCurrent_temp;
     int8_t bmsTemperature_temp;
-    int8_t cycles_temp;
+    uint16_t cycles_temp;
 
     switch (_commandIndex) {
     case 1:
-        Serial.println("CELL VOLTAGES");
+        ESP_LOGI("RS485", "CELL VOLTAGES");
         for (int i = 0; i < 16; i++) {
             cellVoltage[i] = responseToLong(i * 2 + 3);
-            if (DEBUG)
-                Serial.println("Cell #" + (String)(i + 1) + ": " + cellVoltage[i] + " mV");
+
+            ESP_LOGD("RS485", "Cell #%d: %ld mV", i + 1, cellVoltage[i]);
+
         }
-        Serial.println("Cell temperatures");
         for (int i = 0; i < 4; i++) {
+            ESP_LOGI("RS485", "Cell temperatures");
             cellTemperature[i] = responseToLong(35 + i * 2);
-            if (DEBUG)
-                Serial.println("Cell #" + (String)(i + 1) + ": " + cellTemperature[i] + " " + (char)176 + "C");
+            ESP_LOGD("RS485", "Cell #%d: %ld \xb0C", i + 1, cellTemperature[i]);
         }
+
         break;
     case 3:
 
         batteryVoltage_temp = 0.01 * (float)responseToLong(11);
-        batteryCurrent = 0.1 * ((float)responseToCurrent(13));
-        bmsTemperature = responseToLong(19);
-        SOC_temp = responseToLong(21);
-
         if (abs(batteryVoltage - batteryVoltage_temp) < 10 && batteryVoltage_temp != 0) {
             batteryVoltage = batteryVoltage_temp;
-        } else {
         }
 
-        if (abs(SOC - SOC_temp) < 5 || counter >= 10) {
+        batteryCurrent_temp = 0.1 * ((float)responseToCurrent(13));
+        if (abs(batteryCurrent_temp) < 60) {
+            batteryCurrent = batteryCurrent_temp;
+        }
+
+        bmsTemperature = responseToLong(19);
+
+        SOC_temp = responseToLong(21);
+
+        if (abs(SOC - SOC_temp) < 5 || (counter >= 10 && SOC_temp >= 0 && SOC_temp <= 100)) {
             SOC = SOC_temp;
             counter = 0;
         } else {
             counter++;
         }
 
-        if (DEBUG) {
-            Serial.println("BATTERY STATS");
-            Serial.println("Battery voltage: " + (String)batteryVoltage + " V");
-            Serial.println("Battery current: " + (String)batteryCurrent + " A");
-            Serial.println("BMS temperature: " + (String)bmsTemperature + " " + (char)176 + "C");
-            Serial.println("State of charge (SoC): " + (String)SOC + "%");
-        }
+        ESP_LOGI("RS485", "BATTERY STATS");
+        ESP_LOGI("RS485", "Battery voltage: %.2f V", batteryVoltage);
+        ESP_LOGI("RS485", "Battery current: %.2f A", batteryCurrent);
+        ESP_LOGI("RS485", "BMS temperature: %.1f \xb0C", (float)bmsTemperature);
+        ESP_LOGI("RS485", "State of charge (SoC): %d%%", SOC);
+
         break;
 
     case 4:
@@ -233,6 +230,8 @@ void parseResponse(int _commandIndex)
         if ((abs(cycles_temp - cycles) <= 1) || cycles_temp != 0) {
             cycles = cycles_temp;
         }
+        // logResponse();
+
         // MessageOutput.println(cycles);
         // for (int i = 0; i < 80; i++) {
         //     MessageOutput.println(responseToLong(i));
@@ -280,11 +279,11 @@ void setup()
     if (scanClients()) {
         foundClientAddress = true;
         if (DEBUG) {
-            Serial.println("Client found with address " + (String)clientAddress);
+            ESP_LOGI("RS485", "Client found with address %d", clientAddress);
         }
     } else {
         if (DEBUG) {
-            Serial.println("No client found. Idle...");
+            ESP_LOGI("RS485", "No client found. Idle...");
         }
         while (1) { }
     }
@@ -295,10 +294,11 @@ void setup()
     while (Serial1.available()) {
         response[bytesReadSinceLastRequest++] = Serial1.read();
         if (DEBUG)
-            Serial.println(response[bytesReadSinceLastRequest - 1], HEX);
+            ESP_LOGI("RS485", "RX: %02X", response[bytesReadSinceLastRequest - 1]);
         millisSinceLastResponse = millis();
     }
     parseResponse(lastCommandIndex);
+
 
     // Move all dynamic allocations >512byte to psram (if available)
     heap_caps_malloc_extmem_enable(512);
@@ -402,7 +402,7 @@ void loop()
     while (Serial1.available()) {
         response[bytesReadSinceLastRequest++] = Serial1.read();
         if (DEBUG)
-            Serial.println(response[bytesReadSinceLastRequest - 1], HEX);
+            ESP_LOGI("RS485", "RX: %02X", response[bytesReadSinceLastRequest - 1]);
         millisSinceLastResponse = millis();
     }
 
@@ -432,8 +432,8 @@ void loop()
         }
 
         if (DEBUG) {
-            Serial.println("Bytes read since last request: " + (String)bytesReadSinceLastRequest);
-            Serial.println("Command index: " + (String)lastCommandIndex);
+            ESP_LOGI("RS485", "Bytes read since last request: %d", bytesReadSinceLastRequest);
+            ESP_LOGI("RS485", "Command index: %d", lastCommandIndex);
         }
         sendCommand(lastCommandIndex);
         for (int i = 0; i < 80; i++)
@@ -450,15 +450,15 @@ void loop()
 
     if (millis() - millisSinceLastResponse > 30000) {
         if (DEBUG) {
-            Serial.println("No response since 30 seconds, starting address scan...");
+            ESP_LOGI("RS485", "No response since 30 seconds, starting address scan...");
         }
         if (scanClients()) {
             foundClientAddress = true;
             if (DEBUG)
-                Serial.println("Client found with address " + (String)clientAddress);
+                ESP_LOGI("RS485", "Client found with address %d", clientAddress);
         } else {
             if (DEBUG)
-                Serial.println("No client found. Idle...");
+                ESP_LOGI("RS485", "No client found. Idle...");
             while (1) { }
         }
     }

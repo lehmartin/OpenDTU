@@ -20,9 +20,10 @@ enum DeviceClassType {
     DEVICE_CLS_DURATION,
     DEVICE_CLS_SIGNAL_STRENGTH,
     DEVICE_CLS_TEMPERATURE,
-    DEVICE_CLS_RESTART
+    DEVICE_CLS_RESTART,
+    DEVICE_CLS_BATTERY
 };
-const char* const deviceClass_name[] = { 0, "current", "energy", "power", "voltage", "frequency", "power_factor", "reactive_power", "connectivity", "duration", "signal_strength", "temperature", "restart" };
+const char* const deviceClass_name[] = { 0, "current", "energy", "power", "voltage", "frequency", "power_factor", "reactive_power", "connectivity", "duration", "signal_strength", "temperature", "restart", "battery" };
 
 enum StateClassType {
     STATE_CLS_NONE = 0,

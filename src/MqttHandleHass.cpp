@@ -84,7 +84,7 @@ void MqttHandleHassClass::publishConfig()
 
     publishDtuSensor("Battery total voltage", "dtu/battery/voltage", "V", "mdi:current-dc",  DEVICE_CLS_VOLTAGE, STATE_CLS_MEASUREMENT, CATEGORY_NONE);
     publishDtuSensor("Battery charging current", "dtu/battery/current", "A", "mdi:sine-wave",   DEVICE_CLS_CURRENT, STATE_CLS_MEASUREMENT, CATEGORY_NONE);
-    publishDtuSensor("Battery state of charge", "dtu/battery/soc",     "%", "mdi:speedometer", DEVICE_CLS_ENERGY,  STATE_CLS_MEASUREMENT, CATEGORY_NONE);
+    publishDtuSensor("Battery state of charge", "dtu/battery/soc",     "%", "mdi:speedometer", DEVICE_CLS_BATTERY,  STATE_CLS_MEASUREMENT, CATEGORY_NONE);
     publishDtuSensor("Battery storage cycles", "dtu/battery/cycles", "cycles", "mdi:sync-circle",   DEVICE_CLS_NONE, STATE_CLS_MEASUREMENT, CATEGORY_NONE);
 
 
